@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "end": "redsbiomes:block/palm_oak_log_top",
+    "side": "redsbiomes:block/palm_oak_log"
+  }
+}
