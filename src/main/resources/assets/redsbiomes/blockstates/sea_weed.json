@@ -1,0 +1,11 @@
+{
+  "variants": {
+    "waterlogged=false": {
+      "model": "redsbiomes:block/sea_weed",
+      "x": 90
+    },
+    "waterlogged=true": {
+      "model": "redsbiomes:block/sea_weed_planted"
+    }
+  }
+}

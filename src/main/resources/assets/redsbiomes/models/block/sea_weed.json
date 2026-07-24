@@ -1,0 +1,16 @@
+{
+  "ambientocclusion": false,
+  "textures": {
+    "particle": "redsbiomes:block/sea_weed",
+    "sea_weed": "redsbiomes:block/sea_weed"
+  },
+  "elements": [
+    {   "from": [ 0, 0, 0.1 ],
+      "to": [ 16, 16, 0.1 ],
+      "faces": {
+        "north": { "uv": [ 16, 0, 0, 16 ], "texture": "#sea_weed" },
+        "south": { "uv": [ 0, 0, 16, 16 ], "texture": "#sea_weed" }
+      }
+    }
+  ]
+}

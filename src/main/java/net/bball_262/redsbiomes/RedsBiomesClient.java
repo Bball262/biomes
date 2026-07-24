@@ -2,6 +2,7 @@ package net.bball_262.redsbiomes;
 
 import net.bball_262.redsbiomes.entities.ModEntities;
 import net.bball_262.redsbiomes.entities.client.CrabRenderer;
+import net.bball_262.redsbiomes.items.ModItems;
 import net.minecraft.client.renderer.entity.EntityRenderers;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -22,5 +23,6 @@ public class RedsBiomesClient {
     @SubscribeEvent
     static void onClientSetup(FMLClientSetupEvent event) {
         EntityRenderers.register(ModEntities.CRAB_ENTITY_TYPE.get(), CrabRenderer::new);
+        event.enqueueWork(ModItems::registerItemProperties);
     }
 }

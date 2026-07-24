@@ -2,45 +2,45 @@ package net.bball_262.redsbiomes.entities.custom;
 
 import net.bball_262.redsbiomes.entities.CrabVariant;
 import net.bball_262.redsbiomes.entities.ModEntities;
+import net.bball_262.redsbiomes.items.ModItems;
+import net.bball_262.redsbiomes.tags.ModTags;
 import net.minecraft.Util;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.TimeUtil;
-import net.minecraft.util.valueproviders.UniformInt;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.DifficultyInstance;
-import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.*;
-import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
-import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
-import net.minecraft.world.entity.ai.goal.target.ResetUniversalAngerTargetGoal;
 import net.minecraft.world.entity.animal.Animal;
-import net.minecraft.world.entity.monster.ZombifiedPiglin;
+import net.minecraft.world.entity.animal.Bucketable;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.ServerLevelAccessor;
-import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
-public class CrabEntity extends Animal implements NeutralMob {
+public class CrabEntity extends Animal implements Bucketable {
     private static final EntityDataAccessor<Integer> DATA_ID_TYPE_VARIANT = SynchedEntityData.defineId(CrabEntity.class, EntityDataSerializers.INT);
-    private static final EntityDataAccessor<Integer> DATA_REMAINING_ANGER_TIME = SynchedEntityData.defineId(CrabEntity.class, EntityDataSerializers.INT);
-    private static final UniformInt PERSISTENT_ANGER_TIME = TimeUtil.rangeOfSeconds(20, 30);
+    private static final EntityDataAccessor<Boolean> FROM_BUCKET = SynchedEntityData.defineId(CrabEntity.class, EntityDataSerializers.BOOLEAN);
     public final AnimationState idleAnimationState = new AnimationState();
     private int idleAnimationTimeout = 0;
-    @Nullable
-    private UUID persistentAngerTarget;
 
     public CrabEntity(EntityType<? extends Animal> entityType, Level level) {
         super(entityType, level);
@@ -50,68 +50,30 @@ public class CrabEntity extends Animal implements NeutralMob {
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
         builder.define(DATA_ID_TYPE_VARIANT, 0);
-        builder.define(DATA_REMAINING_ANGER_TIME, 0);
+        builder.define(FROM_BUCKET, false);
     }
 
     @Override
     protected void registerGoals() {
-        this.goalSelector.addGoal(0, new MeleeAttackGoal(this, 1.2F, true));
-        this.goalSelector.addGoal(1, new FloatGoal(this));
-        this.goalSelector.addGoal(2, new BreedGoal(this, 1.1F));
-        this.goalSelector.addGoal(3, new TemptGoal(this, 1.1F, stack -> stack.is(Items.KELP), false));
-        this.goalSelector.addGoal(4, new FollowParentGoal(this, 1.1F));
-        this.goalSelector.addGoal(5, new WaterAvoidingRandomStrollGoal(this, 1.0F));
-        this.goalSelector.addGoal(6, new RandomLookAroundGoal(this));
-
-        this.targetSelector.addGoal(1, new HurtByTargetGoal(this).setAlertOthers());
-        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Player.class, 10, true, false, this::isAngryAt));
-        this.targetSelector.addGoal(3, new ResetUniversalAngerTargetGoal<>(this, true));
+        this.goalSelector.addGoal(1, new BreedGoal(this, 1.1F));
+        this.goalSelector.addGoal(2, new TemptGoal(this, 1.1F, stack -> stack.is(Items.KELP), false));
+        this.goalSelector.addGoal(3, new FollowParentGoal(this, 1.1F));
+        this.goalSelector.addGoal(4, new WaterAvoidingRandomStrollGoal(this, 1.0F));
+        this.goalSelector.addGoal(5, new RandomLookAroundGoal(this));
     }
 
     public static AttributeSupplier.Builder createAttributes() {
         return Animal.createLivingAttributes()
                 .add(Attributes.ARMOR, 4d)
                 .add(Attributes.ARMOR_TOUGHNESS, 2d)
-                .add(Attributes.ATTACK_DAMAGE, 2.0)
-                .add(Attributes.ENTITY_INTERACTION_RANGE, 2.0)
                 .add(Attributes.MAX_HEALTH, 6)
                 .add(Attributes.MOVEMENT_SPEED, .2d)
                 .add(Attributes.FOLLOW_RANGE, 24d);
     }
 
-    @Override
-    public boolean hurt(DamageSource source, float amount) {
-        if (source.getEntity() != null) {
-            this.setTarget((LivingEntity) source.getEntity());
-            this.setPersistentAngerTarget(source.getEntity().getUUID());
-        }
-
-        return super.hurt(source, amount);
-    }
-
-    @Override
-    protected void customServerAiStep() {
-        if (this.getTarget() != null) {
-            this.alertOthers();
-        }
-
-        if (this.isAngry()) {
-            this.lastHurtByPlayerTime = this.tickCount;
-        }
-
-        super.customServerAiStep();
-    }
-
-    private void alertOthers() {
-        double d0 = this.getAttributeValue(Attributes.FOLLOW_RANGE);
-        AABB aabb = AABB.unitCubeFromLowerCorner(this.position()).inflate(d0, 10.0, d0);
-        this.level()
-                .getEntitiesOfClass(CrabEntity.class, aabb, EntitySelector.NO_SPECTATORS)
-                .stream()
-                .filter(entity -> entity != this)
-                .filter(entity -> entity.getTarget() == null)
-                .filter(entity -> !entity.isAlliedTo(this.getTarget()))
-                .forEach(entity -> entity.setTarget(this.getTarget()));
+    public static boolean checkCrabSpawnRules(EntityType<? extends Animal> animal, LevelAccessor level, MobSpawnType spawnType, BlockPos pos, RandomSource random) {
+        boolean flag = MobSpawnType.ignoresLightRequirements(spawnType) || isBrightEnoughToSpawn(level, pos);
+        return level.getBlockState(pos.below()).is(ModTags.Blocks.CRAB_SPAWNABLE_ON) && flag;
     }
 
     @Override
@@ -124,11 +86,18 @@ public class CrabEntity extends Animal implements NeutralMob {
         CrabEntity baby = ModEntities.CRAB_ENTITY_TYPE.get().create(level);
 
         if (otherParent instanceof CrabEntity) {
-            List<CrabVariant> variants = new ArrayList<>();
+            Set<CrabVariant> variants = new HashSet<>();
             variants.add(this.getVariant());
             variants.add(((CrabEntity) otherParent).getVariant());
 
-            baby.setVariant(Util.getRandom(variants, baby.getRandom()));
+            if (this.random.nextIntBetweenInclusive(0, 1) == 0) {
+                Set<CrabVariant> excludedVariants = new HashSet<>(Arrays.stream(CrabVariant.values()).toList());
+                excludedVariants.removeAll(variants);
+
+                baby.setVariant(Util.getRandom(excludedVariants.stream().toList(), baby.getRandom()));
+            } else {
+                baby.setVariant(Util.getRandom(variants.stream().toList(), baby.getRandom()));
+            }
         }
 
         return baby;
@@ -156,14 +125,14 @@ public class CrabEntity extends Animal implements NeutralMob {
     public void addAdditionalSaveData(CompoundTag compound) {
         super.addAdditionalSaveData(compound);
         compound.putInt("Variant", this.entityData.get(DATA_ID_TYPE_VARIANT));
-        compound.putInt("Remaining_Anger_Time", this.entityData.get(DATA_REMAINING_ANGER_TIME));
+        compound.putBoolean("From_Bucket", this.fromBucket());
     }
 
     @Override
     public void readAdditionalSaveData(CompoundTag compound) {
         super.readAdditionalSaveData(compound);
         this.setVariant(compound.getInt("Variant"));
-        this.setRemainingPersistentAngerTime(compound.getInt("Remaining_Anger_Time"));
+        this.setFromBucket(compound.getBoolean("From_Bucket"));
     }
 
     private void setVariant(int typeVariant) {
@@ -182,33 +151,114 @@ public class CrabEntity extends Animal implements NeutralMob {
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, MobSpawnType spawnType, @Nullable SpawnGroupData spawnGroupData) {
         CrabVariant variant = Util.getRandom(CrabVariant.values(), this.random);
 
+        if (!variant.isCommon()) {
+            variant = CrabVariant.GRAY;
+        }
+
         this.setVariant(variant);
         return super.finalizeSpawn(level, difficulty, spawnType, spawnGroupData);
     }
 
     @Override
-    public int getRemainingPersistentAngerTime() {
-        return this.entityData.get(DATA_REMAINING_ANGER_TIME);
+    public InteractionResult mobInteract(Player player, InteractionHand hand) {
+        return Bucketable.bucketMobPickup(player, hand, this).orElse(super.mobInteract(player, hand));
     }
 
     @Override
-    public void setRemainingPersistentAngerTime(int i) {
-        this.entityData.set(DATA_REMAINING_ANGER_TIME, i);
-    }
-
-    @Nullable
-    @Override
-    public UUID getPersistentAngerTarget() {
-        return this.persistentAngerTarget;
+    public boolean fromBucket() {
+        return this.entityData.get(FROM_BUCKET);
     }
 
     @Override
-    public void setPersistentAngerTarget(@Nullable UUID uuid) {
-        this.persistentAngerTarget = uuid;
+    public void setFromBucket(boolean b) {
+        this.entityData.set(FROM_BUCKET, b);
     }
 
     @Override
-    public void startPersistentAngerTimer() {
-        this.setRemainingPersistentAngerTime(PERSISTENT_ANGER_TIME.sample(this.random));
+    public void saveToBucketTag(ItemStack stack) {
+        this.saveDataToBucketTag(this, stack);
+    }
+
+    @Override
+    public void loadFromBucketTag(CompoundTag tag) {
+        this.loadDataFromBucketTag(this, tag);
+    }
+
+    @Override
+    public ItemStack getBucketItemStack() {
+        return ModItems.CRAB_BUCKET.toStack();
+    }
+
+    @Override
+    public SoundEvent getPickupSound() {
+        return SoundEvents.BUCKET_FILL_FISH;
+    }
+
+    private void saveDataToBucketTag(CrabEntity crab, ItemStack bucket) {
+        bucket.set(DataComponents.CUSTOM_NAME, crab.getCustomName());
+        CustomData.update(DataComponents.BUCKET_ENTITY_DATA, bucket, (tag) -> {
+            if (crab.isNoAi()) {
+                tag.putBoolean("NoAI", crab.isNoAi());
+            }
+
+            if (crab.isSilent()) {
+                tag.putBoolean("Silent", crab.isSilent());
+            }
+
+            if (crab.isNoGravity()) {
+                tag.putBoolean("NoGravity", crab.isNoGravity());
+            }
+
+            if (crab.hasGlowingTag()) {
+                tag.putBoolean("Glowing", crab.hasGlowingTag());
+            }
+
+            if (crab.isInvulnerable()) {
+                tag.putBoolean("Invulnerable", crab.isInvulnerable());
+            }
+
+            if (crab.isBaby()) {
+                tag.putBoolean("Baby", crab.isBaby());
+                tag.putInt("Age", crab.getAge());
+            }
+
+            tag.putFloat("Health", crab.getHealth());
+            tag.putInt("Variant", crab.getVariant().getId());
+        });
+    }
+
+    private void loadDataFromBucketTag(CrabEntity crab, CompoundTag tag) {
+        if (tag.contains("NoAI")) {
+            crab.setNoAi(tag.getBoolean("NoAI"));
+        }
+
+        if (tag.contains("Silent")) {
+            crab.setSilent(tag.getBoolean("Silent"));
+        }
+
+        if (tag.contains("NoGravity")) {
+            crab.setNoGravity(tag.getBoolean("NoGravity"));
+        }
+
+        if (tag.contains("Glowing")) {
+            crab.setGlowingTag(tag.getBoolean("Glowing"));
+        }
+
+        if (tag.contains("Invulnerable")) {
+            crab.setInvulnerable(tag.getBoolean("Invulnerable"));
+        }
+
+        if (tag.contains("Health")) {
+            crab.setHealth(tag.getFloat("Health"));
+        }
+
+        if (tag.contains("Variant")) {
+            crab.setVariant(tag.getInt("Variant"));
+        }
+
+        if (tag.contains("Baby")) {
+            crab.setBaby(tag.getBoolean("Baby"));
+            crab.setAge(tag.getInt("Age"));
+        }
     }
 }

@@ -18,6 +18,7 @@ public class CrabRenderer extends MobRenderer<CrabEntity, CrabModel<CrabEntity>>
     public static final Map<CrabVariant, ResourceLocation> LOCATION_BY_VARIANT = Util.make(Maps.newEnumMap(CrabVariant.class), map -> {
         map.put(CrabVariant.GRAY, loc("textures/entity/crab/gray_crab.png"));
         map.put(CrabVariant.RED, loc("textures/entity/crab/red_crab.png"));
+        map.put(CrabVariant.PURPLE, loc("textures/entity/crab/purple_crab.png"));
     });
 
     public CrabRenderer(EntityRendererProvider.Context context) {

@@ -1,0 +1,20 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "redsbiomes:item/bucket_of_crab_gray"
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "redsbiomes:crab_variant": 1
+      },
+      "model": "redsbiomes:item/bucket_of_crab_red"
+    },
+    {
+      "predicate": {
+        "redsbiomes:crab_variant": 2
+      },
+      "model": "redsbiomes:item/bucket_of_crab_purple"
+    }
+  ]
+}

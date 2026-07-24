@@ -1,5 +1,7 @@
 {
   "block.redsbiomes.palm_oak_log": "Palm Oak Log",
+  "block.redsbiomes.sea_weed": "Seaweed",
   "entity.redsbiomes.crab": "Crab",
-  "item.redsbiomes.crab_spawn_egg": "Crab Spawn Egg"
+  "item.redsbiomes.crab_spawn_egg": "Crab Spawn Egg",
+  "item.redsbiomes.bucket_of_crab": "Bucket of Crab"
 }
